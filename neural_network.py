@@ -180,9 +180,8 @@ def main():
     # and 1 output value.
     # training_set_inputs = np.array([[0, 0, 1], [0, 1, 1], [1, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1], [0, 0, 0]])
     # training_set_outputs = np.array([[0, 1, 1, 1, 1, 0, 0]]).T
-    training_set_inputs = np.array(
-        [[0, 0, 1, 0], [1, 1, 1, 1], [1, 0, 1, 1], [0, 1, 0, 1], [0, 0, 0, 1], [0, 1, 1, 0], [0, 0, 1, 1]])
-    training_set_outputs = np.array([[1, 1, 1, 0, 0, 1, 1]]).T
+    training_set_inputs = np.array([[0, 0, 1], [0, 1, 1], [1, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1], [0, 0, 0]])
+    training_set_outputs = np.array([[0, 1, 1, 1, 1, 0, 0]]).T
 
     # Train the neural network using the training set.
     # Do it 60,000 times and make small adjustments each time.
@@ -192,8 +191,8 @@ def main():
     neural_network.print_weights()
 
     # Test the neural network with a new situation.
-    print("Test case with a new situation: [0, 0, 0, 0], [1, 0, 0, 0] -> ?: (should be [[0],[1]])")
-    output = neural_network.evaluate(np.array([[0, 0, 0, 0], [1, 0, 0, 0]]))
+    print("Test case with a new situation: [1, 1, 0], [0, 0, 1], [0, 1, 1] -> ?: (should be [[0],[0],[1]])")
+    output = neural_network.evaluate(np.array([[1, 1, 0], [0, 0, 1], [0, 1, 1]]))
     print(output)
 
 

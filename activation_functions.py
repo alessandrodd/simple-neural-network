@@ -66,8 +66,9 @@ def perf_sigmoid_derivative(x):
     :return: the Sigmoid Function's derivate of a single value or numpy array of values
     :rtype: float or np.array
     """
-    result = perf_sigmoid(x)
-    return result * (1 - result)
+    # result = perf_sigmoid(x)
+    # return result * (1 - result)
+    return x * (1 - x)
 
 
 def elliot(x):
@@ -110,9 +111,6 @@ def tanh(x):
     return np.tanh(x)
 
 
-vectorized_tanh = np.vectorize(tanh)
-
-
 def tanh_derivative(x):
     """
     Applies the tanh derivative function element-wise.
@@ -121,10 +119,71 @@ def tanh_derivative(x):
     :return: the tanh Function's derivate of a single value or numpy array of values
     :rtype: float or np.array
     """
-    return 1 - np.power(tanh(x), 2)
+    return 1 - np.power(x, 2)
 
 
-vectorized_tanh_derivative = np.vectorize(tanh_derivative)
+def elliot_function(signal, derivative=False):
+    """ A fast approximation of sigmoid """
+    s = 1  # steepness
+
+    abs_signal = (1 + np.abs(signal * s))
+    if derivative:
+        return 0.5 * s / abs_signal ** 2
+    else:
+        # Return the activation signal
+        return 0.5 * (signal * s) / abs_signal + 0.5
+
+
+# end activation function
+
+
+def symmetric_elliot(x):
+    """ A fast approximation of tanh """
+    s = 1.0  # steepness
+
+    abs_signal = (1 + np.abs(x * s))
+    return (x * s) / abs_signal
+
+
+def symmetric_elliot_derivative(x):
+    """ A fast approximation of tanh derivative """
+    s = 1.0  # steepness
+
+    abs_signal = (1 + np.abs(x * s))
+    return s / abs_signal ** 2
+
+
+def relu(x):
+    return x * (x > 0)
+
+
+def relu_derivative(x):
+    """
+
+    :param x:
+    :return:
+    """
+    return (x > 0).astype(float)
+
+
+def leaky_relu(x, alpha=0.01):
+    pos = ((x + abs(x)) / 2.0)
+    neg = alpha * ((x - abs(x)) / 2.0)
+    return pos + neg
+
+
+def leaky_relu_derivative(x, leakage=0.01):
+    """
+    Leaky Rectified Linear Unit
+    """
+    # noinspection PyTypeChecker
+    return np.clip(x > 0, leakage, 1.0)
+
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    x = e_x / np.sum(e_x, axis=1, keepdims=True)
+    return x
 
 
 def main():
@@ -148,6 +207,20 @@ def main():
     print(str(tanh(matrix)))
     print("Tanh Derivative:")
     print(str(tanh_derivative(matrix)))
+    print("Sym Elliot:")
+    print(str(symmetric_elliot(matrix)))
+    print("Sym Elliot Derivative:")
+    print(str(symmetric_elliot_derivative(matrix)))
+    print("ReLU:")
+    print(str(relu(matrix)))
+    print("ReLu Derivative:")
+    print(str(relu_derivative(matrix)))
+    print("Leaky ReLU:")
+    print(str(leaky_relu(matrix)))
+    print("Leaky ReLU Derivative:")
+    print(str(leaky_relu_derivative(matrix)))
+    print("Softmax:")
+    print(str(softmax(matrix)))
 
 
 if __name__ == "__main__":

@@ -1,15 +1,15 @@
 import logging
 import math
 
-import numpy as np
-
 import fastdot
-from activation_functions import elliot
+import numpy as np
+from activation_functions import elliot, symmetric_elliot, symmetric_elliot_derivative, relu_derivative, relu, \
+    leaky_relu, leaky_relu_derivative
 from activation_functions import elliot_derivative
 from activation_functions import perf_sigmoid
 from activation_functions import perf_sigmoid_derivative
-from activation_functions import vectorized_tanh
-from activation_functions import vectorized_tanh_derivative
+from activation_functions import tanh
+from activation_functions import tanh_derivative
 
 
 class NeuronLayer(object):
@@ -17,21 +17,44 @@ class NeuronLayer(object):
     Represents a single Neural Network layer. Implements any input layer, output layer or hidden layer
     """
 
-    def __init__(self, number_of_neurons, number_of_inputs_per_neuron, biased=False):
+    def __init__(self, number_of_neurons, number_of_inputs_per_neuron, activation_function_name='sigmoid',
+                 biased=False):
         """
 
         :param number_of_neurons: neurons in the layer
         :param number_of_inputs_per_neuron: inputs to this layer; should be equal to the number of
                                            neurons in the previous layer or, if this is the first layer
                                            in a Neural Network, should be equal to the input dimensionality
+        :param activation_function_name: a string that indicates which activation should be used, e.g. 'tanh'
         :param biased: True if it has a bias
         """
         # We use Xavier initialization. Here for more information:
         # https://prateekvjoshi.com/2016/03/29/understanding-xavier-initialization-in-deep-neural-networks/
         variance = 1 / number_of_inputs_per_neuron
         self.weights = np.random.normal(0, math.sqrt(variance), size=(number_of_inputs_per_neuron, number_of_neurons))
+        if activation_function_name == 'sigmoid':
+            self.activation_function = perf_sigmoid
+            self.activation_derivative = perf_sigmoid_derivative
+        elif activation_function_name == 'tanh':
+            self.activation_function = tanh
+            self.activation_derivative = tanh_derivative
+        elif activation_function_name == 'elliot':
+            self.activation_function = elliot
+            self.activation_derivative = elliot_derivative
+        elif activation_function_name == 'symmetric_elliot':
+            self.activation_function = symmetric_elliot
+            self.activation_derivative = symmetric_elliot_derivative
+        elif activation_function_name == 'relu':
+            self.activation_function = relu
+            self.activation_derivative = relu_derivative
+        elif activation_function_name == 'leaky_relu':
+            self.activation_function = leaky_relu
+            self.activation_derivative = leaky_relu_derivative
+        else:
+            logging.error("Invalid activation function: '{0}'".format(activation_function_name))
+            return
         if biased:
-            self.bias = np.ones((1, number_of_neurons))
+            self.bias = np.zeros((1, number_of_neurons))
         else:
             self.bias = None
 
@@ -41,13 +64,12 @@ class NeuralNetwork(object):
     A simple Neural Network implementation
     """
 
-    def __init__(self, layers, learning_rate=0.1, activation_function_name='elliot'):
+    def __init__(self, layers, learning_rate=0.1):
         """
 
         :param layers: a list of Neuron Layers
         :param learning_rate: training parameter that controls the size of weight and bias changes in learning of
                                the training algorithm.
-        :param activation_function_name: a string that indicates which activation should be used, e.g. 'tanh'
         """
         if len(layers) < 1:
             logging.error("Invalid layers size: '{0}' (min is 1)".format(len(layers)))
@@ -60,18 +82,6 @@ class NeuralNetwork(object):
             self.learning_rate = learning_rate
             # Choose an activation function for forward propagation
             # and the corrispettive derivative for backward propagation
-        if activation_function_name == 'sigmoid':
-            self.activation_function = perf_sigmoid
-            self.activation_derivative = perf_sigmoid_derivative
-        elif activation_function_name == 'tanh':
-            self.activation_function = vectorized_tanh
-            self.activation_derivative = vectorized_tanh_derivative
-        elif activation_function_name == 'elliot':
-            self.activation_function = elliot
-            self.activation_derivative = elliot_derivative
-        else:
-            logging.error("Invalid activation function: '{0}'".format(activation_function_name))
-            return
 
     def train(self, input_values, output_values, epochs):
         """
@@ -107,7 +117,7 @@ class NeuralNetwork(object):
                     error = output_values - outputs[j]
                 else:
                     error = fastdot.dot(next_layer_delta, self.layers[j + 1].weights.T)
-                slope = self.activation_derivative(outputs[j])
+                slope = self.layers[j].activation_derivative(outputs[j])
                 # Hadamard product, i.e. entrywise product
                 delta = np.multiply(error, slope)
                 next_layer_delta = delta
@@ -135,7 +145,7 @@ class NeuralNetwork(object):
             s_i = fastdot.dot(inputs, self.layers[i].weights)
             if self.layers[i].bias is not None:
                 s_i += self.layers[i].bias
-            z_i = self.activation_function(s_i)
+            z_i = self.layers[i].activation_function(s_i)
             outputs.append(z_i)
             # the input to the next layer is the output of this layer
             inputs = z_i
@@ -151,6 +161,21 @@ class NeuralNetwork(object):
         """
         return self.compute_outputs(inputs)[-1]
 
+    def classify(self, inputs):
+        output = self.evaluate(inputs)
+        for i in range(len(output)):
+            output[i][0] = round(output[i][0], 0)
+        return output
+
+    def score(self, inputs, expected_outputs):
+        output = self.classify(inputs)
+        score = 0
+        for i in range(len(output)):
+            if output[i][0] == expected_outputs[i][0]:
+                score += 1
+        score = score / len(output)
+        return score
+
     def print_weights(self):
         """
         The neural network prints its weights
@@ -163,15 +188,15 @@ class NeuralNetwork(object):
 def main():
     logging.basicConfig(level=logging.INFO)
     # Layer 1: 5 neurons, each with 4 inputs
-    layer1 = NeuronLayer(5, 4, True)
+    layer1 = NeuronLayer(5, 3, 'leaky_relu', True)
     # Layer 2: 5 neurons, each with 5 inputs
-    layer2 = NeuronLayer(5, 5, True)
+    layer2 = NeuronLayer(5, 5, 'leaky_relu', True)
     # Layer 3: 1 neuron with 5 inputs (output layer)
-    layer3 = NeuronLayer(1, 5, True)
+    layer3 = NeuronLayer(1, 5, 'sigmoid', True)
 
     # Combine the layers to create a neural network
     layers = [layer1, layer2, layer3]
-    neural_network = NeuralNetwork(layers, learning_rate=0.1, activation_function_name='sigmoid')
+    neural_network = NeuralNetwork(layers, learning_rate=0.1)
 
     print("Random initial weights: ")
     neural_network.print_weights()
@@ -185,7 +210,7 @@ def main():
 
     # Train the neural network using the training set.
     # Do it 60,000 times and make small adjustments each time.
-    neural_network.train(training_set_inputs, training_set_outputs, 25000)
+    neural_network.train(training_set_inputs, training_set_outputs, 1000)
 
     print("Layers weights after training: ")
     neural_network.print_weights()

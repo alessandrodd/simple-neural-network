@@ -32,6 +32,8 @@ class NeuronLayer(object):
         # https://prateekvjoshi.com/2016/03/29/understanding-xavier-initialization-in-deep-neural-networks/
         variance = 1 / number_of_inputs_per_neuron
         self.weights = np.random.normal(0, math.sqrt(variance), size=(number_of_inputs_per_neuron, number_of_neurons))
+        # Choose an activation function for forward propagation
+        # and the corrispettive derivative for backward propagation
         if activation_function_name == 'sigmoid':
             self.activation_function = perf_sigmoid
             self.activation_derivative = perf_sigmoid_derivative
@@ -64,7 +66,7 @@ class NeuralNetwork(object):
     A simple Neural Network implementation
     """
 
-    def __init__(self, layers, learning_rate=0.1):
+    def __init__(self, layers, learning_rate=0.1, step_decay_factor=0.5, epochs_drop=10):
         """
 
         :param layers: a list of Neuron Layers
@@ -80,8 +82,11 @@ class NeuralNetwork(object):
             return
         else:
             self.learning_rate = learning_rate
-            # Choose an activation function for forward propagation
-            # and the corrispettive derivative for backward propagation
+
+        assert step_decay_factor >= 0
+        self.step_decay_factor = step_decay_factor
+        assert epochs_drop > 0
+        self.epochs_drop = epochs_drop
 
     def train(self, input_values, output_values, epochs):
         """
@@ -100,10 +105,16 @@ class NeuralNetwork(object):
                                                                                               input_values.shape[0]))
             return
         logging.debug("Training started")
+        learning_rate = self.learning_rate
         for iteration in range(epochs):
             progress = iteration / epochs * 100
             if progress.is_integer():
                 logging.debug("{0}% complete".format(progress))
+
+            # learning rate decay
+            if (iteration + 1) % self.epochs_drop == 0:
+                learning_rate = learning_rate * self.step_decay_factor
+
             # Forward Propogation
             outputs = self.compute_outputs(input_values)
 
@@ -114,24 +125,26 @@ class NeuralNetwork(object):
             for j in range(len(self.layers) - 1, -1, -1):
                 # for the latest layer, the error is calculated from the expected output
                 if j == (len(self.layers) - 1):
-                    error = output_values - outputs[j]
+                    error = outputs[j] - output_values
+                    error = np.power(error, 2) * np.sign(error)
                 else:
                     error = fastdot.dot(next_layer_delta, self.layers[j + 1].weights.T)
                 slope = self.layers[j].activation_derivative(outputs[j])
                 # Hadamard product, i.e. entrywise product
                 delta = np.multiply(error, slope)
                 next_layer_delta = delta
-
                 # Calculate how much to adjust the weights by
                 if j == 0:
-                    adjustment = fastdot.dot(input_values.T, delta)
+                    adjustment = fastdot.dot(input_values.T, delta) / input_values.shape[0]
                 else:
-                    adjustment = fastdot.dot(outputs[j - 1].T, delta)
-                self.layers[j].weights += np.multiply(adjustment, self.learning_rate)
+                    adjustment = fastdot.dot(outputs[j - 1].T, delta) / input_values.shape[0]
+                self.layers[j].weights += np.multiply(-adjustment, learning_rate)
                 if self.layers[j].bias is not None:
                     # bias are like neurons with fixed input 1; we sum on columns because it's like multiplying
                     # a one-row matrix with all ones
-                    self.layers[j].bias += np.multiply(np.sum(delta, axis=0, keepdims=True), self.learning_rate)
+                    self.layers[j].bias += np.multiply(-np.sum(delta, axis=0, keepdims=True), learning_rate)
+
+            print(self.calculate_loss(input_values, output_values))
 
     def compute_outputs(self, inputs):
         """
@@ -150,6 +163,15 @@ class NeuralNetwork(object):
             # the input to the next layer is the output of this layer
             inputs = z_i
         return outputs
+
+    # Helper function to evaluate the total loss on the dataset
+    def calculate_loss(self, inputs, outputs_values):
+        prediction = self.evaluate(inputs)
+        # Calculating the loss
+        logloss = outputs_values * np.log(prediction)
+        logloss += (1 - outputs_values) * np.log(1 - prediction)
+        data_loss = np.sum(logloss)
+        return 1. / len(prediction) * data_loss
 
     def evaluate(self, inputs):
         """

@@ -40,8 +40,7 @@ def sigmoid_derivative(x):
     :return: the Sigmoid Function's derivate of a single value or numpy array of values
     :rtype: float or np.array
     """
-    result = sigmoid(x)
-    return result * (1 - result)
+    return x * (1 - x)
 
 
 vectorized_sigmoid_derivative = np.vectorize(sigmoid_derivative)
@@ -122,23 +121,14 @@ def tanh_derivative(x):
     return 1 - np.power(x, 2)
 
 
-def elliot_function(signal, derivative=False):
-    """ A fast approximation of sigmoid """
-    s = 1  # steepness
-
-    abs_signal = (1 + np.abs(signal * s))
-    if derivative:
-        return 0.5 * s / abs_signal ** 2
-    else:
-        # Return the activation signal
-        return 0.5 * (signal * s) / abs_signal + 0.5
-
-
-# end activation function
-
-
 def symmetric_elliot(x):
-    """ A fast approximation of tanh """
+    """
+    Fast approximation of tanh
+
+    :param x: a number or numpy.array of numbers
+    :return: the simmetric elliot function of the input
+    :rtype: float or np.array
+    """
     s = 1.0  # steepness
 
     abs_signal = (1 + np.abs(x * s))
@@ -146,7 +136,13 @@ def symmetric_elliot(x):
 
 
 def symmetric_elliot_derivative(x):
-    """ A fast approximation of tanh derivative """
+    """
+    Fast approximation of tanh derivative
+
+    :param x: a number or numpy.array of numbers
+    :return: the simmetric elliot function derivative of the input
+    :rtype: float or np.array
+    """
     s = 1.0  # steepness
 
     abs_signal = (1 + np.abs(x * s))
@@ -154,34 +150,63 @@ def symmetric_elliot_derivative(x):
 
 
 def relu(x):
+    """
+    Rectified Linear Unit
+
+    :param x: a number or numpy.array of numbers
+    :return: the ReLU function of the input
+    :rtype: float or np.array
+    """
     return x * (x > 0)
 
 
 def relu_derivative(x):
     """
+    Rectified Linear Unit derivative
 
-    :param x:
-    :return:
+    :param x: a number or numpy.array of numbers
+    :return: the ReLU function derivative of the input
+    :rtype: float or np.array
     """
     return (x > 0).astype(float)
 
 
-def leaky_relu(x, alpha=0.01):
+def leaky_relu(x, leakage=0.01):
+    """
+    Rectified Linear Unit - leaky version
+
+    :param x: a number or numpy.array of numbers
+    :param leakage: small non-zero gradient value
+    :return: the LReLU function of the input
+    :rtype: float or np.array
+    """
     pos = ((x + abs(x)) / 2.0)
-    neg = alpha * ((x - abs(x)) / 2.0)
+    neg = leakage * ((x - abs(x)) / 2.0)
     return pos + neg
 
 
 def leaky_relu_derivative(x, leakage=0.01):
     """
-    Leaky Rectified Linear Unit
+    Rectified Linear Unit - leaky version Derivative
+
+    :param x: a number or numpy.array of numbers
+    :param leakage: small non-zero gradient value
+    :return: the LReLU function derivative of the input
+    :rtype: float or np.array
     """
     # noinspection PyTypeChecker
     return np.clip(x > 0, leakage, 1.0)
 
 
 def softmax(x):
-    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    """
+    Softmax function, or Normalized Exponential function
+
+    :param x: a number or numpy.array of numbers
+    :return: the softmax function of the input
+    :rtype: float or np.array
+    """
+    e_x = np.exp(x)
     x = e_x / np.sum(e_x, axis=1, keepdims=True)
     return x
 

@@ -4,7 +4,7 @@ import math
 import fastdot
 import numpy as np
 from activation_functions import elliot, symmetric_elliot, symmetric_elliot_derivative, relu_derivative, relu, \
-    leaky_relu, leaky_relu_derivative
+    leaky_relu, leaky_relu_derivative, softmax
 from activation_functions import elliot_derivative
 from activation_functions import perf_sigmoid
 from activation_functions import perf_sigmoid_derivative
@@ -52,9 +52,13 @@ class NeuronLayer(object):
         elif activation_function_name == 'leaky_relu':
             self.activation_function = leaky_relu
             self.activation_derivative = leaky_relu_derivative
+        elif activation_function_name == 'softmax':
+            self.activation_function = softmax
+            self.activation_derivative = None
         else:
             logging.error("Invalid activation function: '{0}'".format(activation_function_name))
             return
+        self.activation_function_name = activation_function_name
         if biased:
             self.bias = np.zeros((1, number_of_neurons))
         else:
@@ -125,8 +129,8 @@ class NeuralNetwork(object):
             for j in range(len(self.layers) - 1, -1, -1):
                 # for the latest layer, the error is calculated from the expected output
                 if j == (len(self.layers) - 1):
-                    error = outputs[j] - output_values
-                    error = np.power(error, 2) * np.sign(error)
+                    error = output_values - outputs[j]
+                    # error = np.power(error, 2) * np.sign(error)
                 else:
                     error = fastdot.dot(next_layer_delta, self.layers[j + 1].weights.T)
                 slope = self.layers[j].activation_derivative(outputs[j])
@@ -138,13 +142,14 @@ class NeuralNetwork(object):
                     adjustment = fastdot.dot(input_values.T, delta) / input_values.shape[0]
                 else:
                     adjustment = fastdot.dot(outputs[j - 1].T, delta) / input_values.shape[0]
-                self.layers[j].weights += np.multiply(-adjustment, learning_rate)
+                self.layers[j].weights += np.multiply(adjustment, learning_rate)
                 if self.layers[j].bias is not None:
                     # bias are like neurons with fixed input 1; we sum on columns because it's like multiplying
                     # a one-row matrix with all ones
-                    self.layers[j].bias += np.multiply(-np.sum(delta, axis=0, keepdims=True), learning_rate)
+                    self.layers[j].bias += np.multiply(np.sum(delta, axis=0, keepdims=True), learning_rate)
 
-            print(self.calculate_loss(input_values, output_values))
+            if progress.is_integer() and logging.getLogger().isEnabledFor(logging.DEBUG):
+                logging.debug(self.calculate_loss(input_values, output_values))
 
     def compute_outputs(self, inputs):
         """
@@ -152,6 +157,7 @@ class NeuralNetwork(object):
 
         :param inputs: a numpy matrix where each row is an input value of dimension equals to the number of columns
         :return: a list of numpy arrays where the latest corresponds to the output of the Neural Network
+        :rtype: list
         """
         outputs = []
         for i in range(len(self.layers)):
@@ -164,8 +170,14 @@ class NeuralNetwork(object):
             inputs = z_i
         return outputs
 
-    # Helper function to evaluate the total loss on the dataset
     def calculate_loss(self, inputs, outputs_values):
+        """
+        Helper function to evaluate the total loss on the dataset
+        :param inputs: a numpy matrix where each row is an input value of dimension equals to the number of columns
+        :param outputs_values: expected output for each sample in the input set
+        :return: the total logloss on the dataset
+        :rtype: float
+        """
         prediction = self.evaluate(inputs)
         # Calculating the loss
         logloss = outputs_values * np.log(prediction)
@@ -184,12 +196,28 @@ class NeuralNetwork(object):
         return self.compute_outputs(inputs)[-1]
 
     def classify(self, inputs):
+        """
+        Classifies one or more inputs
+
+        :param inputs: a numpy matrix where each row is an input value of dimension equals to the number of columns
+        :return: a numpy matrix where each row is the computed class
+        :rtype: np.array
+        """
         output = self.evaluate(inputs)
         for i in range(len(output)):
             output[i][0] = round(output[i][0], 0)
         return output
 
     def score(self, inputs, expected_outputs):
+        """
+        Given a test set, returns the score (ratio between the number of correctly guessed samples
+        and the number of samples in test)
+
+        :param inputs: a numpy matrix where each row is an input value of dimension equals to the number of columns
+        :param expected_outputs: expected output for each sample in the input set
+        :return: ratio between the number of correctly guessed samples and the number of samples in test
+        :rtype: float
+        """
         output = self.classify(inputs)
         score = 0
         for i in range(len(output)):
@@ -224,20 +252,19 @@ def main():
     neural_network.print_weights()
 
     # The training set. We have 7 examples, each consisting of 3 input values
-    # and 1 output value.
-    # training_set_inputs = np.array([[0, 0, 1], [0, 1, 1], [1, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1], [0, 0, 0]])
-    # training_set_outputs = np.array([[0, 1, 1, 1, 1, 0, 0]]).T
+    # and 1 output value. The rule here is:
+    #  (x XOR y) AND z
     training_set_inputs = np.array([[0, 0, 1], [0, 1, 1], [1, 0, 1], [0, 1, 0], [1, 0, 0], [1, 1, 1], [0, 0, 0]])
     training_set_outputs = np.array([[0, 1, 1, 1, 1, 0, 0]]).T
 
     # Train the neural network using the training set.
-    # Do it 60,000 times and make small adjustments each time.
+    # Do it 1000 times and make small adjustments each time.
     neural_network.train(training_set_inputs, training_set_outputs, 1000)
 
     print("Layers weights after training: ")
     neural_network.print_weights()
 
-    # Test the neural network with a new situation.
+    # Test the neural network with a new situation
     print("Test case with a new situation: [1, 1, 0], [0, 0, 1], [0, 1, 1] -> ?: (should be [[0],[0],[1]])")
     output = neural_network.evaluate(np.array([[1, 1, 0], [0, 0, 1], [0, 1, 1]]))
     print(output)
